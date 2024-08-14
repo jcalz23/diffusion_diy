@@ -1,0 +1,8 @@
+einops
+lpips
+ipywidgets
+torch
+torchvision
+numpy
+matplotlib
+tqdm
