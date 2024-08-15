@@ -15,7 +15,7 @@ if __name__ == "__main__":
 
     ae_model = AutoEncoder([4, 4, 4]).cuda()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    n_epochs =   50  #@param {'type':'integer'}
+    n_epochs =   100  #@param {'type':'integer'}
     ## size of a mini-batch
     batch_size =  2048   #@param {'type':'integer'}
     ## learning rate
@@ -23,6 +23,13 @@ if __name__ == "__main__":
 
     dataset = MNIST('.', train=True, transform=transforms.ToTensor(), download=True)
     data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=0)
+    
+    total_params = sum(p.numel() for p in ae_model.parameters())
+    trainable_params = sum(p.numel() for p in ae_model.parameters() if p.requires_grad)
+    print(f"Total parameters: {total_params:,}")
+    print(f"Trainable parameters: {trainable_params:,}")
+    print(f"Non-trainable parameters: {total_params - trainable_params:,}")
+    print("-----------------------------")
 
     optimizer = Adam(ae_model.parameters(), lr=lr)
     tqdm_epoch = trange(n_epochs)
@@ -43,4 +50,4 @@ if __name__ == "__main__":
     # Print the averaged training loss so far.
     tqdm_epoch.set_description('Average Loss: {:5f}'.format(avg_loss / num_items))
     # Update the checkpoint after each epoch of training.
-    torch.save(ae_model.state_dict(), f'ckpt_mnist_ae_{n_epochs}e.pth')
+    torch.save(ae_model.state_dict(), f'ckpt_mnist_new_ae_{n_epochs}e.pth')

@@ -5,8 +5,7 @@ import torchvision.transforms as transforms
 from torchvision.datasets import MNIST
 
 from models import UNet_Tranformer
-from utils import marginal_prob_std, diffusion_coeff
-from train import train_diffusion_model
+from utils import marginal_prob_std, diffusion_coeff, train_diffusion_model
 
 if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -36,4 +35,4 @@ if __name__ == "__main__":
                           n_epochs=n_epochs,
                           batch_size=batch_size,
                           lr=lr,
-                          model_name=f"mnist_ddpm_{n_epochs}e")
+                          model_name=f"mnist_ddpm_mse_{n_epochs}e")

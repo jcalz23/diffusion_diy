@@ -50,6 +50,7 @@ class UNet_Tranformer(nn.Module):
         self.cond_embed = nn.Embedding(nClass, text_dim)
 
     def forward(self, x, t, y=None):
+        # Embed time and text
         embed = self.act(self.time_embed(t))
         y_embed = self.cond_embed(y).unsqueeze(1)
         
@@ -67,6 +68,7 @@ class UNet_Tranformer(nn.Module):
         h = self.act(self.tgnorm2(self.tconv2(h + h2) + self.dense7(embed)))
         h = self.tconv1(h + h1)
 
+        # Normalize predicted noise by std at time t
         h = h / self.marginal_prob_std(t)[:, None, None, None]
         return h
     
@@ -158,9 +160,7 @@ class Latent_UNet_Tranformer(nn.Module):
         embed = self.act(self.time_embed(t))
         y_embed = self.cond_embed(y).unsqueeze(1)
         # Encoding path
-        ## Incorporate information from t
         h1 = self.conv1(x) + self.dense1(embed)
-        ## Group normalization
         h1 = self.act(self.gnorm1(h1))
         h2 = self.conv2(h1) + self.dense2(embed)
         h2 = self.act(self.gnorm2(h2))

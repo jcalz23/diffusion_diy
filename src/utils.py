@@ -5,6 +5,7 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import LambdaLR
 from torch.optim import Adam
 from torch.utils.data import DataLoader
+import torch.nn.functional as F
 from tqdm import tqdm, trange
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -17,6 +18,15 @@ def train_diffusion_model(dataset,
                           batch_size =  1024,
                           lr=10e-4,
                           model_name="transformer"):
+    # Print model architecture size
+    total_params = sum(p.numel() for p in score_model.parameters())
+    trainable_params = sum(p.numel() for p in score_model.parameters() if p.requires_grad)
+    
+    print(f"Model: {model_name}")
+    print(f"Total parameters: {total_params:,}")
+    print(f"Trainable parameters: {trainable_params:,}")
+    print(f"Non-trainable parameters: {total_params - trainable_params:,}")
+    print("-----------------------------")
 
     data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4)
 
@@ -28,12 +38,18 @@ def train_diffusion_model(dataset,
         num_items = 0
         for x, y in tqdm(data_loader):
             x = x.to(device)
+            # if "ldm" in model_name:
+            #     loss = loss_fn_cond_ldm(score_model, x, y, marginal_prob_std_fn)
+            # else:
             loss = loss_fn_cond(score_model, x, y, marginal_prob_std_fn)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             avg_loss += loss.item() * x.shape[0]
             num_items += x.shape[0]
+            
+            if epoch % 10 == 0:
+                print(f"Epoch: {epoch}, Loss: {loss:5f}")
     scheduler.step()
     lr_current = scheduler.get_last_lr()[0]
     print('{} Average Loss: {:5f} lr {:.1e}'.format(epoch, avg_loss / num_items, lr_current))
@@ -66,14 +82,68 @@ def marginal_prob_std(t, sigma):
 def diffusion_coeff(t, sigma):
     return sigma**t.to(device)
 
+import torch
+
 def loss_fn_cond(model, x, y, marginal_prob_std, eps=1e-5):
+    """
+    Computes the loss for a conditional denoising diffusion probabilistic model (DDPM).
+
+    Args:
+        model: The neural network model that predicts the score (i.e., the gradient of the log probability).
+        x (torch.Tensor): The original data samples (e.g., images) with shape (batch_size, channels, height, width).
+        y (torch.Tensor): The conditional information (e.g., class labels or other auxiliary data).
+        marginal_prob_std (function): A function that returns the standard deviation of the noise at a given time step.
+        eps (float, optional): A small value to ensure numerical stability. Default is 1e-5.
+
+    Returns:
+        torch.Tensor: The computed loss as a scalar tensor.
+    """
+    
+    # Sample a random time step for each sample in the batch.
     random_t = torch.rand(x.shape[0], device=x.device) * (1. - eps) + eps
+    
+    # Sample random noise from a standard normal distribution with the same shape as the input.
     z = torch.randn_like(x)
+    
+    # Compute the standard deviation of the noise at the sampled time step.
     std = marginal_prob_std(random_t)
+    
+    # Perturb the input data with the sampled noise, scaled by the computed standard deviation.
     perturbed_x = x + z * std[:, None, None, None]
+    
+    # Predict the score (denoising direction) using the model.
+    # The model takes the perturbed data, the time step, and the conditional information as inputs.
     score = model(perturbed_x, random_t, y=y)
-    loss = torch.mean(torch.sum((score * std[:, None, None, None] + z)**2, dim=(1,2,3)))
+    
+    # Compute the loss as the mean squared error between the predicted score and the true noise,
+    # weighted by the standard deviation.
+    #loss = torch.mean(torch.sum((score * std[:, None, None, None] - z)**2, dim=(1,2,3)))
+    loss = F.mse_loss(score * std[:, None, None, None], -z, reduction='mean')
+    
     return loss
+
+# def loss_fn_cond_ldm(model, x, y, marginal_prob_std, eps=1e-5):
+#     random_t = torch.rand(x.shape[0], device=x.device) * (1. - eps) + eps
+#     z = torch.randn_like(x)
+#     std = marginal_prob_std(random_t)
+#     perturbed_x = x + z * std[:, None, None, None]
+    
+#     # Model output (predicted scaled noise)
+#     model_output = model(perturbed_x, random_t, y=y)
+    
+#     # Rescale the output to get the predicted noise
+#     predicted_noise = model_output * std[:, None, None, None]
+    
+#     # Reconstruction loss (simplified MSE)
+#     recon_loss = torch.mean(torch.sum((predicted_noise - z)**2, dim=(1,2,3)))
+    
+#     # KL-divergence loss (using the rescaled prediction)
+#     kl_loss = torch.mean(torch.sum(predicted_noise**2, dim=(1,2,3))) / 2
+    
+#     # Combine losses
+#     loss = recon_loss + kl_loss
+    
+#     return loss
 
 def Euler_Maruyama_sampler(score_model,
               marginal_prob_std,

@@ -24,18 +24,18 @@ if __name__ == "__main__":
     score_model = score_model.to(device)
 
     # Define training params
-    n_epochs = 2000
+    n_epochs = 200
     batch_size = 1024
-    lr = 3e-4
+    lr = 1e-3
 
     # Load the TensorDataset
-    dataset = torch.load('mnist_latent_tensordataset.pt')
+    dataset = torch.load(f'mnist_latent_original.pt')
 
     # Run
     train_diffusion_model(dataset,
-                          score_model,
-                          marginal_prob_std_fn,
-                          n_epochs=n_epochs,
-                          batch_size=batch_size,
-                          lr=lr,
-                          model_name=f"mnist_ldm_3e4_{n_epochs}e")
+                        score_model,
+                        marginal_prob_std_fn,
+                        n_epochs=n_epochs,
+                        batch_size=batch_size,
+                        lr=lr,
+                        model_name=f"mnist_ldm_{str(lr)}_{n_epochs}e")
