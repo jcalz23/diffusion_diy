@@ -24,9 +24,9 @@ if __name__ == "__main__":
     score_model = score_model.to(device)
 
     # Define training params
-    n_epochs = 100
+    n_epochs = 2000
     batch_size = 1024
-    lr = 5e-4
+    lr = 3e-4
 
     # Load the TensorDataset
     dataset = torch.load('mnist_latent_tensordataset.pt')
@@ -38,4 +38,4 @@ if __name__ == "__main__":
                           n_epochs=n_epochs,
                           batch_size=batch_size,
                           lr=lr,
-                          model_name=f"mnist_ldm_lr5e4_{n_epochs}e")
+                          model_name=f"mnist_ldm_3e4_{n_epochs}e")
