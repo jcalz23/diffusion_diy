@@ -10,6 +10,7 @@ from utils import marginal_prob_std, diffusion_coeff, train_diffusion_model
 if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+    
     # Define noise fns, params
     sigma = 25.0
     marginal_prob_std_fn = functools.partial(marginal_prob_std, sigma=sigma)
@@ -18,18 +19,18 @@ if __name__ == "__main__":
     print("initialize new score model...")
     score_model = torch.nn.DataParallel(
         Latent_UNet_Tranformer(
-            marginal_prob_std=marginal_prob_std_fn, channels = [4, 16, 32, 64]
+            marginal_prob_std=marginal_prob_std_fn, channels = [16, 32, 64, 128]
         )
     )
     score_model = score_model.to(device)
 
     # Define training params
-    n_epochs = 200
+    n_epochs = 100
     batch_size = 1024
     lr = 1e-3
 
     # Load the TensorDataset
-    dataset = torch.load(f'mnist_latent_original.pt')
+    dataset = torch.load(f'latent_data/mnist_latent_16d.pt')
 
     # Run
     train_diffusion_model(dataset,

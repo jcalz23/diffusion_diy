@@ -122,28 +122,54 @@ def loss_fn_cond(model, x, y, marginal_prob_std, eps=1e-5):
     
     return loss
 
-# def loss_fn_cond_ldm(model, x, y, marginal_prob_std, eps=1e-5):
-#     random_t = torch.rand(x.shape[0], device=x.device) * (1. - eps) + eps
-#     z = torch.randn_like(x)
-#     std = marginal_prob_std(random_t)
-#     perturbed_x = x + z * std[:, None, None, None]
+from torchvision.models import vgg16
+import lpips
+
+def loss_fn_cond_lpips(model, x, y, marginal_prob_std, eps=1e-5, lpips_weight=0.1):
+    """
+    Computes the loss for a conditional denoising diffusion probabilistic model (DDPM)
+    with additional LPIPS perceptual loss.
+
+    Args:
+        model: The neural network model that predicts the score.
+        x (torch.Tensor): The original data samples.
+        y (torch.Tensor): The conditional information.
+        marginal_prob_std (function): A function that returns the standard deviation of the noise.
+        eps (float, optional): A small value to ensure numerical stability. Default is 1e-5.
+        lpips_weight (float, optional): Weight for the LPIPS loss. Default is 0.1.
+
+    Returns:
+        torch.Tensor: The computed loss as a scalar tensor.
+    """
     
-#     # Model output (predicted scaled noise)
-#     model_output = model(perturbed_x, random_t, y=y)
+    # Initialize LPIPS loss function
+    lpips_fn = lpips.LPIPS(net='vgg').to(x.device)
     
-#     # Rescale the output to get the predicted noise
-#     predicted_noise = model_output * std[:, None, None, None]
+    # Sample random time step and noise
+    random_t = torch.rand(x.shape[0], device=x.device) * (1. - eps) + eps
+    z = torch.randn_like(x)
     
-#     # Reconstruction loss (simplified MSE)
-#     recon_loss = torch.mean(torch.sum((predicted_noise - z)**2, dim=(1,2,3)))
+    # Compute standard deviation and perturb input
+    std = marginal_prob_std(random_t)
+    perturbed_x = x + z * std[:, None, None, None]
     
-#     # KL-divergence loss (using the rescaled prediction)
-#     kl_loss = torch.mean(torch.sum(predicted_noise**2, dim=(1,2,3))) / 2
+    # Predict the score
+    score = model(perturbed_x, random_t, y=y)
     
-#     # Combine losses
-#     loss = recon_loss + kl_loss
+    # Compute MSE loss
+    mse_loss = F.mse_loss(score * std[:, None, None, None], -z, reduction='mean')
     
-#     return loss
+    # Compute LPIPS loss
+    # We need to ensure the input is in the right format for LPIPS (3 channels)
+    x_3ch = x.repeat(1, 3, 1, 1) if x.shape[1] == 1 else x
+    perturbed_x_3ch = perturbed_x.repeat(1, 3, 1, 1) if perturbed_x.shape[1] == 1 else perturbed_x
+    lpips_loss = lpips_fn(x_3ch, perturbed_x_3ch).mean()
+    
+    # Combine losses
+    total_loss = mse_loss + lpips_weight * lpips_loss
+    
+    return total_loss
+
 
 def Euler_Maruyama_sampler(score_model,
               marginal_prob_std,
